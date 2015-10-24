@@ -1,0 +1,204 @@
+---
+Title: TP 0 : Régression linéaire
+---
+
+<<echo=False>>=
+import os
+import sys
+import numpy
+from matplotlib import pyplot
+import locale
+
+from lib import plot
+
+from lib.tp0 import *
+
+dmax = 30
+folds = 10
+plot_precision = 0.01
+
+colors = pyplot.rcParams["axes.color_cycle"]
+@
+
+## Introduction
+
+### Régression linéaire
+
+Étant donné une fonction $f$ et un échantillon de données (potentiellement bruitées) $(x_i, y_i)_N$
+tels que $y_i \simeq f(x_i)$, on veut trouver une fonction paramétrique $f_\theta$ "proche" de $f$
+(qui minimise le risque réel). Puisqu'il n'est pas possible de calculer le risque réel sans
+connaître $f$, on cherche à minimiser le risque empirique :
+
+$$\frac{1}{N} \sum_{i=1}^N{(y_i - f_\theta(x_i))^2}$$
+
+Il convient de choisir une famille de fonction paramétrique. On choisit ici la famille des polynômes
+de degré $n$ : $\{f_\theta(x) = \theta \cdot \vec{x}\ |\ \theta \in \mathbb{R}^n\}$ où
+$\vec{x}^\top = (1, x, \dots, x^n)$. Notons $X$ la matrice telle que $X_{i,j} = x_j^{i-1}$. Calculer
+la fonction $f_\theta$ minimisant le risque empirique revient alors à calculer $\theta$ tel que :
+
+$$X X^\top \theta = X y$$
+
+### Validation croisée
+
+<<echo=False>>=
+x = numpy.arange(-5., 5.1, 0.5)
+
+X = numpy.matrix([phi(d,x) for d in range(0, 3)])
+y = x**2 + numpy.random.normal(0, 0.5, x.size)
+y = numpy.matrix(y).T
+
+theta0 = numpy.matrix([0., 0., 1.]).T
+risk0 = risk(X, y, theta0)
+
+theta1 = least_square(X, y)
+risk1 = risk(X, y, theta1)
+
+X = numpy.matrix([phi(d,x) for d in range(0, 21)])
+theta2 = least_square(X, y)
+risk2 = risk(X, y, theta2)
+@
+
+Cependant, minimiser le risque empirique peut entraîner un surapprentissage des données. Par
+exemple, prenons comme échantillon de données $(x_i, x_i^2 + \epsilon_i)_N$, où $\epsilon_i$ est
+un nombre tiré aléatoirement selon une loi normale (représentant le bruit). Si on calcule le
+polynôme de degré 2 minimisant le risque empirique, on obtient un polynôme proche de
+$x \mapsto x^2$, et un risque d'environ <%= locale.format('%.3f', risk1) %>. Si on calcule le
+polynôme de degré 20 minimisant le risque empirique, le risque obtenu est moindre
+(<%= locale.format('%.3f', risk2) %>), mais la fonction obtenue (représentée en violet ci-dessous) est très
+dépendante du bruit.
+
+<<echo=False, output='raw', fig=True, caption="Surapprentissage des données">>=
+data, = pyplot.plot(x, y, 'o', color=colors[1], zorder=3, label="Échantillon")
+deg1, = plot.plot_function(f(theta1), plot_precision, color=colors[0], zorder=1, label="Polynôme de degré 2")
+deg2, = plot.plot_function(f(theta2), plot_precision, color=colors[2], zorder=2, label="Polynôme de degré 20")
+pyplot.legend(handles=[data, deg1, deg2])
+
+pyplot.show()
+@
+
+Il est donc important de sélectionner une famille de fonctions permettant  d'obtenir une
+approximation suffisamment précise de $f$, mais d'éviter un surapprentissage. Dans le cas des
+familles de polynômes que nous utilisons, cela revient à choisir le degré du polynôme. On peut
+sélectionner une telle famille de fonctions grâce à une méthode de *validation croisée*.
+
+On divise l'échantillon en $k$ sous-échantillons. On sélectionne un de ces sous-échantillons
+(l'échantillon de test), on effectue la régression sur les $k-1$ autres sous-échantillons
+(l'échantillon d'apprentissage), puis on calcule le risque empirique sur l'échantillon de test. On
+répète cette opération sur chacun des sous-échantillons, et on calcule la moyenne des risques
+empiriques obtenus. Cette moyenne nous donne une estimation de la fiabilité de la famille de
+fonctions choisis. On calcule alors cette moyenne pour les familles de polynômes de degré $n$ avec
+$n \leq d_{max}$, et on sélectionne la famille qui donne la moyenne minimale.
+
+<<echo=False>>=
+risks = list(best_degree(x, y, phi, 25, 7))
+best_risk, best_d = min(risks)
+
+risks, degrees = zip(*risks)
+@
+
+Par exemple, pour l'échantillon donné précédemment, les risques empiriques moyens sont représentés
+en figure 2. Le meilleur risque (<%= locale.format('%.3f', best_risk) %>) est obtenu avec la famille
+de polynômes de degré <%= best_d %>.
+
+<<echo=False, results='raw', fig=True, caption="Validation croisée">>=
+fig = pyplot.figure()
+pyplot.yscale('log')
+pyplot.plot(degrees, risks)
+best, = pyplot.plot([best_d], [best_risk], 'o', label="Meilleur risque empirique moyen")
+pyplot.xlabel('Degré')
+pyplot.ylabel('Risque empirique moyen')
+pyplot.legend(handles=[best])
+pyplot.show()
+@
+
+## Exemple 1
+
+<<echo=False>>=
+datadir = "data/tp0/1"
+
+x, y = read_data(datadir)
+@
+
+Les données utilisées dans cette exemple sont tirées du dossier `<%= datadir %>`. La validation
+croisée est effectuée pour les familles de polynômes de degré inférieur à <%= dmax %> avec des
+sous-échantillons de taille <%= folds %>.
+
+<<echo=False, results='raw', fig=True, caption="Validation croisée">>=
+risks = list(best_degree(x, y, phi, dmax, folds))
+best_risk, best_d = min(risks)
+
+risks, degrees = zip(*risks)
+
+fig = pyplot.figure()
+pyplot.yscale('log')
+pyplot.plot(degrees, risks)
+best, = pyplot.plot([best_d], [best_risk], 'o', label="Meilleur risque empirique moyen")
+pyplot.xlabel('Degré')
+pyplot.ylabel('Risque empirique moyen')
+pyplot.legend(handles=[best])
+pyplot.show()
+@
+
+Le meilleur risque (<%= locale.format('%.3f', best_risk) %>) est obtenu avec la famille
+de polynômes de degré <%= best_d %>. Le polynôme de degré <%= best_d %> minimisant le risque
+empirique est :
+
+<<echo=False>>=
+X = numpy.matrix([phi(d,x) for d in range(0, best_d+1)])
+theta = least_square(X, y)
+@
+
+$$x \mapsto <%= f_str(theta) %>$$
+
+<<echo=False, results='raw', fig=True, caption="Fonction obtenue">>=
+pyplot.plot(x, y, 'o', color=colors[1], zorder=2)
+plot.plot_function(f(theta), plot_precision, color=colors[0], zorder=1)
+
+pyplot.show()
+@
+
+## Exemple 2
+
+<<echo=False>>=
+datadir = "data/tp0/2"
+
+x, y = read_data(datadir)
+@
+
+Les données utilisées dans cette exemple sont tirées du dossier `<%= datadir %>`. La validation
+croisée est effectuée pour les familles de polynômes de degré inférieur à <%= dmax %> avec des
+sous-échantillons de taille <%= folds %>.
+
+<<echo=False, results='raw', fig=True, caption="Validation croisée">>=
+risks = list(best_degree(x, y, phi, dmax, folds))
+best_risk, best_d = min(risks)
+
+risks, degrees = zip(*risks)
+
+fig = pyplot.figure()
+pyplot.yscale('log')
+pyplot.plot(degrees, risks)
+best, = pyplot.plot([best_d], [best_risk], 'o', label="Meilleur risque empirique moyen")
+pyplot.xlabel('Degré')
+pyplot.ylabel('Risque empirique moyen')
+pyplot.legend(handles=[best])
+pyplot.show()
+@
+
+Le meilleur risque (<%= locale.format('%.3f', best_risk) %>) est obtenu avec la famille
+de polynômes de degré <%= best_d %>. Le polynôme de degré <%= best_d %> minimisant le risque
+empirique est :
+
+<<echo=False>>=
+X = numpy.matrix([phi(d,x) for d in range(0, best_d+1)])
+theta = least_square(X, y)
+@
+
+$$x \mapsto <%= f_str(theta) %>$$
+
+<<echo=False, results='raw', fig=True, caption="Fonction obtenue">>=
+pyplot.plot(x, y, 'o', color=colors[1], zorder=2)
+plot.plot_function(f(theta), plot_precision, color=colors[0], zorder=1)
+
+pyplot.show()
+@

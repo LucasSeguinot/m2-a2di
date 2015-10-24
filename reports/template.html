@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>%(title)s</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimal-ui">
+  <link rel="stylesheet" type="text/css" href="./css/pygments.css">
+  <link rel="stylesheet" type="text/css" href="./css/style.css">
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      jax: ["input/TeX", "output/HTML-CSS"],
+      "HTML-CSS": { linebreaks: { automatic: true },
+                     imageFont: null },
+      showMathMenu: false
+    });
+  </script>
+  <script type="text/javascript" src="MathJax/MathJax.js"></script>
+</head>
+<body>
+<article class="markdown-body">
+  <h1>%(title)s</h1>
+  
+  %(content)s
+</article>
+</body>
+</html>
